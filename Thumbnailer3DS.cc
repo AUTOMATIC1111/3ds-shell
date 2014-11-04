@@ -13,13 +13,15 @@ using namespace std;
 
 #define elems(x) (sizeof(x)/sizeof((x)[0]))
 
-ThumbPropertyType propertyRawPid(1,_T("Dump3DSFile.RAWPID"),_T("Raw product ID, 3DS"));
-ThumbPropertyType propertyPid(2,_T("Dump3DSFile.PID"),_T("Product ID, 3DS"));
+ThumbPropertyType propertyRawPid(1,_T("Dump3DSFile.RAWPID"),_T("Raw code, 3DS"));
+ThumbPropertyType propertyPid(2,_T("Dump3DSFile.PID"),_T("Product code, 3DS"));
 ThumbPropertyType propertyTitle(3,_T("Dump3DSFile.Title"),_T("Title, 3DS"));
 ThumbPropertyType propertyRegion(4,_T("Dump3DSFile.Region"),_T("Region, 3DS"));
 ThumbPropertyType propertyDate(5,_T("Dump3DSFile.Date"),_T("Release date, 3DS"));
 ThumbPropertyType propertyRating(6,_T("Dump3DSFile.Rating"),_T("Rating, 3DS"));
 ThumbPropertyType propertyPublisher(7,_T("Dump3DSFile.Publisher"),_T("Publisher, 3DS"));
+ThumbPropertyType propertyProgramId(8,_T("Dump3DSFile.ProgramId"),_T("Program Id, 3DS"));
+ThumbPropertyType propertyMediatype(9,_T("Dump3DSFile.Mediatype"),_T("Save type, 3DS"));
 
 class Thumbnailer3DS;
 
@@ -29,6 +31,9 @@ public:
 	~Thumb3DS();
 
 	Thumbnailer3DS *th;
+
+	unsigned long long programId;
+	unsigned char mediaType;
 
 	std::string pid;
 	std::string rawPid;
@@ -73,6 +78,12 @@ Thumb3DS::Thumb3DS(Stream *st,Thumbnailer3DS *thumbnailer){
 
 	rawPid=pidfield;
 	pid=pidfield+6;
+
+	stream->seek(0x18d,0);
+	stream->read(&mediaType,1);
+
+	stream->seek(0x1118,0);
+	stream->read(&programId,8);
 
 	String filename=format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(pid)));
 	FileStream infostream(cstr(filename),_T("r"));
@@ -134,13 +145,9 @@ void Thumb3DS::Thumbnail(){
 	
 	result.composite(th->overlay,CenterGravity,OverCompositeOp);
 
-	
-	std::string s=std::string("b:/")+pid+".png";
-	result.write(s);
 	image=result;
 }
 void Thumb3DS::ReadProperties(){
-	
 	propertyPid.setValue(this,s2ws(pid));
 
 	propertyTitle.setValue(this,s2ws(title));
@@ -150,6 +157,15 @@ void Thumb3DS::ReadProperties(){
 	propertyPublisher.setValue(this,s2ws(publisher));
 
 	propertyRawPid.setValue(this,s2ws(rawPid));
+
+	char *mediaTypes[]={ "Inner Device", "Card1", "Card2", "Extended Device" };
+	if(mediaType<elems(mediaTypes))
+		propertyMediatype.setValue(this,cs2ws(mediaTypes[mediaType]));
+	else
+		propertyMediatype.setValue(this,format(_T("Unknown(%d)"),mediaType));
+
+	propertyProgramId.setValue(this,format(_T("%016llx"),programId));
+
 }
 void Thumb3DS::WriteProperties(){
 }
@@ -179,6 +195,8 @@ Thumbnailer3DS::Thumbnailer3DS(){
 	properties.push_back(&propertyRating);
 	properties.push_back(&propertyPublisher);
 	properties.push_back(&propertyRawPid);
+	properties.push_back(&propertyProgramId);
+	properties.push_back(&propertyMediatype);
 }
 
 Thumbnailer3DS::~Thumbnailer3DS(){

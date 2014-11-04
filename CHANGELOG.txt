@@ -10,3 +10,8 @@
   * Added support for 3dz files.
   * Added some missing icons.
 
+1.2
+
+  * Removed debug code that was writing images to b:/.
+  * Added Program ID and Save type properties.
+  * Fixed image mask nor working for thumbs.
