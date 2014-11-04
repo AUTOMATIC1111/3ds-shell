@@ -1,0 +1,12 @@
+﻿1.0
+
+  * INITIAL RELEASE!
+
+1.1
+
+  * Fixed thumbnailer not working on Windows XP.
+  * Fixed extension not installing into directories with spaces in filenames.
+  * Changed property names to include the text 3DS so that they don't clutter similar names.
+  * Added support for 3dz files.
+  * Added some missing icons.
+

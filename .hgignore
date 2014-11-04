@@ -1,0 +1,18 @@
+syntax: glob
+*.rar
+*.ini
+*.idl
+3ds-shell-src
+3ds-shell-x32
+3ds-shell-x64
+*.opensdf
+*.sdf
+*.suo
+*.vcxproj.user
+Debug-x64
+ipch
+Release-x32
+Release-x64
+include
+lib-x32
+lib-x64
