@@ -126,7 +126,6 @@ bool RegistryWrite(HKEY root,LPCTSTR path,LPCTSTR key,LPCTSTR val){
 	CRegKey regkey;
 	LONG lRet;
 
-
 	regkey.Create(root,path);
 	lRet = regkey.Open ( root,path, KEY_SET_VALUE );
 
@@ -141,6 +140,23 @@ bool RegistryWrite(HKEY root,LPCTSTR path,LPCTSTR key,LPCTSTR val){
 	return lRet==ERROR_SUCCESS;
 }
 
+String RegistryRead(HKEY root,LPCTSTR path,LPCTSTR key){
+	CRegKey regkey;
+
+	regkey.Create(root,path);
+
+	if (regkey.Open(root,path,KEY_READ)!=ERROR_SUCCESS){
+		regkey.Close();
+		return _T("");
+	}
+	
+	TCHAR value[0x200]=_T("");
+	ULONG nchars=sizeof(value)/sizeof(value[0]);
+
+	regkey.QueryStringValue(key,value,&nchars);
+	regkey.Close();
+	return value;
+}
 bool RegistryCreate(HKEY root,LPCTSTR path){
 	CRegKey regkey;
 	LONG lRet;
@@ -183,9 +199,28 @@ STDAPI DllRegisterServer(){
 	if(thumbnailer->extensions.empty())
 		thumbnailer->extensions.push_back(EXTENSION);
 	
+	std::vector<String> types;
+	types.push_back(_T(CLASSNAME));
+	
 	for(int i=0; i < thumbnailer->extensions.size(); i++){
 		String regKey=_T(".")+s2ws(thumbnailer->extensions[i]);
 		RegistryWrite(HKEY_CLASSES_ROOT,cstr(regKey),_T(""),_T(CLASSNAME));
+		
+		/* If user has custom handler for file type, insert \\ShellEx\\IconHandler
+		 * into it as well. */
+		String regPath=String(_T("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts\\"))+regKey+_T("\\UserChoice");
+		
+		String handler=RegistryRead(HKEY_CURRENT_USER,cstr(regPath),_T("Progid"));
+		if(! handler.empty()){
+			types.push_back(handler);
+		}
+	}
+
+	for(int i=0; i < types.size(); i++){
+		String type=types[i];
+
+		RegistryCreate(HKEY_CLASSES_ROOT,cstr(type+_T("\\ShellEx")));
+		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type+_T("\\ShellEx\\IconHandler")),_T(""),Guid);
 	}
 
 	_stprintf(key,_T("CLSID\\%s"),Guid);
@@ -196,21 +231,17 @@ STDAPI DllRegisterServer(){
 	RegistryCreate(HKEY_CLASSES_ROOT,key);
 	RegistryWrite(HKEY_CLASSES_ROOT,key,_T(""),dllFilename);
 	RegistryWrite(HKEY_CLASSES_ROOT,key,_T("ThreadingModel"),_T("Apartment"));
-	
 
 	RegistryCreate(HKEY_CLASSES_ROOT,_T(CLASSNAME));
 	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\DefaultIcon"),_T(""),_T("%1"));
 
-	RegistryCreate(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\ShellEx"));
-	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\ShellEx\\IconHandler"),_T(""),Guid);
-	
 	/* register moveover hint handler */
 	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\ShellEx\\{00021500-0000-0000-C000-000000000046}"),_T(""),Guid);
 
 	/* register thumb handler */
 	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\ShellEx\\{E357FCCD-A995-4576-B01F-234630154E96}"),_T(""),Guid);
 	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME),_T("Treatment"),_T("0"));
-	
+
 	/* property handler */
 	for(int i=0; i < thumbnailer->extensions.size(); i++){
 		String regKey=_T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PropertySystem\\PropertyHandlers\\.")+s2ws(thumbnailer->extensions[i]);
