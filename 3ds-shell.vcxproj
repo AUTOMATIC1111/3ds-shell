@@ -149,7 +149,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="exception.cc" />
+    <ClCompile Include="exdialog.cpp" />
     <ClCompile Include="exstream.cc" />
+    <ClCompile Include="Properties.cpp" />
     <ClCompile Include="ShellPreview.cc" />
     <ClCompile Include="ShellPreviewExt.cc" />
     <ClCompile Include="ShellUtils.cc" />
@@ -160,7 +162,9 @@
   <ItemGroup>
     <ClInclude Include="defines.h" />
     <ClInclude Include="exception.h" />
+    <ClInclude Include="exdialog.h" />
     <ClInclude Include="exstream.h" />
+    <ClInclude Include="Properties.h" />
     <ClInclude Include="ShellPreviewExt.h" />
     <ClInclude Include="ShellUtils.h" />
     <ClInclude Include="Thumbnailer.h" />

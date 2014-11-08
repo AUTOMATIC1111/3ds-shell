@@ -1,10 +1,13 @@
 #include "Thumbnailer.h"
 #include "tchar.h"
 #include "propkey.h"
+#include "exdialog.h"
 #include "ShellUtils.h"
+#include "properties.h"
 #include <vector> 
 #include <list>
 #include <unordered_map> 
+#include <Shlwapi.h>
 
 void Log(TCHAR *s,...);
 
@@ -18,10 +21,11 @@ ThumbPropertyType propertyPid(2,_T("Dump3DSFile.PID"),_T("Product code, 3DS"));
 ThumbPropertyType propertyTitle(3,_T("Dump3DSFile.Title"),_T("Title, 3DS"));
 ThumbPropertyType propertyRegion(4,_T("Dump3DSFile.Region"),_T("Region, 3DS"));
 ThumbPropertyType propertyDate(5,_T("Dump3DSFile.Date"),_T("Release date, 3DS"));
-ThumbPropertyType propertyRating(6,_T("Dump3DSFile.Rating"),_T("Rating, 3DS"));
+ThumbPropertyType propertySoftwareRating(6,_T("Dump3DSFile.Rating"),_T("Rating, 3DS"));
 ThumbPropertyType propertyPublisher(7,_T("Dump3DSFile.Publisher"),_T("Publisher, 3DS"));
 ThumbPropertyType propertyProgramId(8,_T("Dump3DSFile.ProgramId"),_T("Program Id, 3DS"));
 ThumbPropertyType propertyMediatype(9,_T("Dump3DSFile.Mediatype"),_T("Save type, 3DS"));
+ThumbPropertyType propertyRating(PKEY_Rating,_T("System.Rating"));
 
 class Thumbnailer3DS;
 
@@ -45,10 +49,14 @@ public:
 	std::string publisher;
 	std::string boxshot;
 	std::string barcode;
+	std::string userRating;
 
 	void Thumbnail();
 	void ReadProperties();
 	void WriteProperties();
+
+	void readProps(Properties & props);
+	void writeProps(Properties & props);
 
 	Stream *stream;
 };
@@ -79,48 +87,51 @@ Thumb3DS::Thumb3DS(Stream *st,Thumbnailer3DS *thumbnailer){
 	rawPid=pidfield;
 	pid=pidfield+6;
 
+	for(const char *p=pid.c_str();*p!='\0';p++){
+		char c=*p;
+
+		if(c>='a' && c<='z') continue;
+		if(c>='A' && c<='Z') continue;
+		if(c>='0' && c<='9') continue;
+		if(c=='-') continue;
+
+		pid="";
+		break;
+	}
+
 	stream->seek(0x18d,0);
 	stream->read(&mediaType,1);
 
 	stream->seek(0x1118,0);
 	stream->read(&programId,8);
 
-	String filename=format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(pid)));
-	FileStream infostream(cstr(filename),_T("r"));
-	if(infostream.file!=NULL){
-		std::string line;
-		while(! (line=infostream.readline()).empty()){
-			char *s=(char *)line.c_str();
 
-			char *p=strchr(s,':');
-			if(p==NULL) continue;
-			*p=NULL;
-			p++; while(isspace(*p)) p++;
-
-			int length;
-			while(length=(int)strlen(p), length>0 && (p[length-1]=='\r' || p[length-1]=='\n'))
-				p[length-1]='\0';
-			
-			if(strcmp(s,"Title")==0)
-				title=p;
-			else if(strcmp(s,"Region")==0)
-				region=p;
-			else if(strcmp(s,"Date")==0)
-				date=p;
-			else if(strcmp(s,"Rating")==0)
-				rating=p;
-			else if(strcmp(s,"Publisher")==0)
-				publisher=p;
-			else if(strcmp(s,"Boxshot")==0)
-				boxshot=p;
-			else if(strcmp(s,"Barcode")==0)
-				barcode=p;
-		}
-	}
-
+	Properties props;
+	props.read(cstr(format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+	props.read(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+	readProps(props);
 }
 Thumb3DS::~Thumb3DS(){
 
+}
+void Thumb3DS::readProps(Properties & props){
+	if(props.contains("Title"))			title=props.get("Title");
+	if(props.contains("UserRating"))	userRating=props.get("UserRating");
+	if(props.contains("Region"))		region=props.get("Region");
+	if(props.contains("Date"))			date=props.get("Date");
+	if(props.contains("Rating"))		rating=props.get("Rating");
+	if(props.contains("Publisher"))		publisher=props.get("Publisher");
+	if(props.contains("Boxshot"))		boxshot=props.get("Boxshot");
+	if(props.contains("Barcode"))		barcode=props.get("Barcode");
+}
+void Thumb3DS::writeProps(Properties & props){
+	props.set("Title",ws2s(propertyTitle.getValue(this)));
+	props.set("UserRating",ws2s(propertyRating.getValue(this)));
+	props.set("Region",ws2s(propertyRegion.getValue(this)));
+	props.set("Date",ws2s(propertyDate.getValue(this)));
+	props.set("Rating",ws2s(propertySoftwareRating.getValue(this)));
+	props.set("Publisher",ws2s(propertyPublisher.getValue(this)));
+	props.set("Boxshot",boxshot);
 }
 
 void Thumb3DS::Thumbnail(){
@@ -131,10 +142,14 @@ void Thumb3DS::Thumbnail(){
 	result.composite(th->bg,Geometry(width,width),OverCompositeOp);
 	
 	Image img;
-	String filename=format(_T("%s\\boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
+	String filename=format(_T("%s\\user-boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
 	ReadImageFromFile(cstr(filename),&img);
 	if(! img.isValid()){
-		img=th->empty;
+		String filename=format(_T("%s\\boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
+		ReadImageFromFile(cstr(filename),&img);
+		if(! img.isValid()){
+			img=th->empty;
+		}
 	}
 	img.resize(Geometry(182,182));
 	
@@ -153,8 +168,10 @@ void Thumb3DS::ReadProperties(){
 	propertyTitle.setValue(this,s2ws(title));
 	propertyRegion.setValue(this,s2ws(region));
 	propertyDate.setValue(this,s2ws(date));
-	propertyRating.setValue(this,s2ws(rating));
+	propertySoftwareRating.setValue(this,s2ws(rating));
 	propertyPublisher.setValue(this,s2ws(publisher));
+	propertyRating.setValue(this,s2ws(userRating));
+	
 
 	propertyRawPid.setValue(this,s2ws(rawPid));
 
@@ -168,7 +185,77 @@ void Thumb3DS::ReadProperties(){
 
 }
 void Thumb3DS::WriteProperties(){
+	if(pid.empty()) return;
+
+	Properties props;
+
+	writeProps(props);
+
+	props.write(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
 }
+
+extern "C" __declspec(dllexport) void CALLBACK WriteBoxshotW(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmdLine, int nCmdShow){
+	FileStream stream(lpszCmdLine,_T("rb"));
+	if(stream.file==NULL){
+		MessageBox(hwnd,cstr(String(_T("File not found: "))+lpszCmdLine),_T("Error"),0);
+		return;
+	}
+
+	Thumbnailer3DS thumbnailer;
+	Thumb3DS *thumb=(Thumb3DS *) thumbnailer.Process(&stream);
+
+	if(thumb->pid.empty()){
+		MessageBox(hwnd,cstr(String(_T("Bad file: "))+lpszCmdLine),_T("Error"),0);
+		return;
+	}
+
+	stream.close();
+
+	Dialog dialog;
+	
+	dialog.title=_T("Choose picture");
+	dialog.filter=_T("Known image types\0*.JPG;*.JPEG;*.PNG;*.GIF;*.BMP;*.TGA\0All files\0*.*\0");
+	dialog.flags=OFN_EXPLORER|OFN_FILEMUSTEXIST|OFN_HIDEREADONLY;
+
+	if(! dialog.open())
+		return;
+
+	FileStream input(cstr(dialog.filename),_T("rb"));
+	if(input.file==NULL){
+		MessageBox(hwnd,cstr(String(_T("Couldn't open file for reading: "))+dialog.filename),_T("Error"),0);
+		return;
+	}
+
+	TCHAR *ext=PathFindExtension(cstr(dialog.filename));
+
+	String outputFilename=format(_T("%s\\user-boxshot\\%s%s"),dllDirectory,cstr(s2ws(thumb->pid)),ext);
+	FileStream output(cstr(outputFilename),_T("wb"));
+	if(output.file==NULL){
+		MessageBox(hwnd,cstr(String(_T("Couldn't open file for writing: "))+outputFilename),_T("Error"),0);
+		return;
+	}
+
+	char data[0x400];
+	size_t length;
+	while((length=input.read(data,sizeof(data)))!=0){
+		output.write(data,length);
+	}
+
+	output.close();
+	input.close();
+
+	String propLocation=format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(thumb->pid)));
+	Properties props;
+	props.read(cstr(format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(thumb->pid)))));
+	props.read(cstr(propLocation));
+	props.set("Boxshot",thumb->pid+ws2s(ext));
+	props.write(cstr(propLocation));
+
+	reloadExplorer();
+
+	delete thumb;
+}
+				
 
 Thumbnailer3DS::Thumbnailer3DS(){
 	TCHAR filename[0x1000];
@@ -185,18 +272,31 @@ Thumbnailer3DS::Thumbnailer3DS(){
 	_stprintf(filename,_T("%s\\images\\empty.png"),dllDirectory);
 	ReadImageFromFile(filename,&empty);
 
+	CreateDirectory(cstr(format(_T("%s\\user-info"),dllDirectory)),NULL);
+	CreateDirectory(cstr(format(_T("%s\\user-boxshot"),dllDirectory)),NULL);
+
 	extensions.push_back("3ds");
 	extensions.push_back("3dz");
+
+	addFileCommand("Change picture...","WriteBoxshot");
+
+	propertyTitle.editable=true;
+	propertyRating.editable=true;
+	propertyRegion.editable=true;
+	propertyDate.editable=true;
+	propertySoftwareRating.editable=true;
+	propertyPublisher.editable=true;
 
 	properties.push_back(&propertyPid);
 	properties.push_back(&propertyTitle);
 	properties.push_back(&propertyRegion);
 	properties.push_back(&propertyDate);
-	properties.push_back(&propertyRating);
+	properties.push_back(&propertySoftwareRating);
 	properties.push_back(&propertyPublisher);
 	properties.push_back(&propertyRawPid);
 	properties.push_back(&propertyProgramId);
 	properties.push_back(&propertyMediatype);
+	properties.push_back(&propertyRating);
 }
 
 Thumbnailer3DS::~Thumbnailer3DS(){

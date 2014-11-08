@@ -47,4 +47,6 @@ std::tstring filesize(size_t size);
 
 void list(TCHAR *path, void (*handler)(TCHAR *filename));
 
+void reloadExplorer();
+
 #endif

@@ -47,6 +47,9 @@ public:
 	virtual ~Thumbnailer(){};
 
 	std::vector<std::string> extensions;
+	std::vector<std::pair<std::string,std::string>> fileCommands;
+
+	void addFileCommand(std::string text,std::string functionName);
 
 	std::vector<ThumbPropertyType *> properties;
 	void registerProperties();

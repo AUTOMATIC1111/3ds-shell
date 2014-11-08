@@ -1,4 +1,5 @@
 #include "ShellUtils.h"
+#include <shlobj.h>
 
 std::tstring format(const TCHAR *fmt,va_list ap){
     int size = 100;
@@ -188,4 +189,9 @@ void list(TCHAR *path, void (*handler)(TCHAR *filename)){
     while(FindNextFile(hFind, &fdFile));
 
     FindClose(hFind);
+}
+
+void reloadExplorer(){
+	SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,NULL,NULL);
+	SendMessageTimeout(HWND_BROADCAST,WM_SETTINGCHANGE,0,NULL,SMTO_ABORTIFHUNG,1000,NULL);
 }

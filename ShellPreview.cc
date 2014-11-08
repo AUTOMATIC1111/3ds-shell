@@ -18,6 +18,7 @@ extern CComModule _Module;
 #include <gdiplus.h>
 
 TCHAR dllFilename[0x1000];
+TCHAR dllShortFilename[0x1000];
 TCHAR dllDirectory[0x1000];
 TCHAR Guid[0x100];
 Thumbnailer *thumbnailer;
@@ -72,6 +73,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID /*lpReserved*/){
 		GetModuleFileName(GetCurrentModuleHandle(),dllFilename,0x1000);
 		_tcscpy(dllDirectory,dllFilename);
 		PathRemoveFileSpec(dllDirectory);
+		GetShortPathName(dllFilename,dllShortFilename,0x1000);
 
 		Gdiplus::GdiplusStartupInput gdiplusStartupInput;
 		ULONG_PTR gdiplusToken;
@@ -139,7 +141,6 @@ bool RegistryWrite(HKEY root,LPCTSTR path,LPCTSTR key,LPCTSTR val){
 	regkey.Close();
 	return lRet==ERROR_SUCCESS;
 }
-
 String RegistryRead(HKEY root,LPCTSTR path,LPCTSTR key){
 	CRegKey regkey;
 
@@ -188,11 +189,6 @@ void touch(char *filename){
 	fclose(f);
 } 
 
-void reloadExplorer(){
-	SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,NULL,NULL);
-	SendMessageTimeout(HWND_BROADCAST,WM_SETTINGCHANGE,0,NULL,SMTO_ABORTIFHUNG,1000,NULL);
-}
-
 STDAPI DllRegisterServer(){
 	TCHAR key[0x1000];
 	
@@ -219,6 +215,7 @@ STDAPI DllRegisterServer(){
 	for(int i=0; i < types.size(); i++){
 		String type=types[i];
 
+		RegistryCreate(HKEY_CLASSES_ROOT,cstr(type));
 		RegistryCreate(HKEY_CLASSES_ROOT,cstr(type+_T("\\ShellEx")));
 		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type+_T("\\ShellEx\\IconHandler")),_T(""),Guid);
 	}
@@ -232,15 +229,6 @@ STDAPI DllRegisterServer(){
 	RegistryWrite(HKEY_CLASSES_ROOT,key,_T(""),dllFilename);
 	RegistryWrite(HKEY_CLASSES_ROOT,key,_T("ThreadingModel"),_T("Apartment"));
 
-	RegistryCreate(HKEY_CLASSES_ROOT,_T(CLASSNAME));
-	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\DefaultIcon"),_T(""),_T("%1"));
-
-	/* register moveover hint handler */
-	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\ShellEx\\{00021500-0000-0000-C000-000000000046}"),_T(""),Guid);
-
-	/* register thumb handler */
-	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME) _T("\\ShellEx\\{E357FCCD-A995-4576-B01F-234630154E96}"),_T(""),Guid);
-	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME),_T("Treatment"),_T("0"));
 
 	/* property handler */
 	for(int i=0; i < thumbnailer->extensions.size(); i++){
@@ -256,7 +244,33 @@ STDAPI DllRegisterServer(){
 		propInfo+=(*iter)->name;
 	}
 	propInfo+=_T(";System.DateChanged;System.DateCreated;System.ItemFolderPathDisplay");
-	RegistryWrite(HKEY_CLASSES_ROOT,_T(CLASSNAME),_T("PreviewDetails"),cstr(propInfo));
+	
+	
+	for(int i=0; i < types.size(); i++){
+		String type=types[i];
+
+		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type),_T("PreviewDetails"),cstr(propInfo));
+		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type+_T("\\DefaultIcon")),_T(""),_T("%1"));
+
+		/* register moveover hint handler */
+		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type+_T("\\ShellEx\\{00021500-0000-0000-C000-000000000046}")) ,_T(""),Guid);
+
+		/* register thumb handler */
+		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type+_T("\\ShellEx\\{E357FCCD-A995-4576-B01F-234630154E96}")),_T(""),Guid);
+		RegistryWrite(HKEY_CLASSES_ROOT,cstr(type),_T("Treatment"),_T("0"));
+	
+		/* Register explorer context click menu commands */
+		for(int i=0; i < thumbnailer->fileCommands.size(); i++){
+			std::string text=thumbnailer->fileCommands[i].first;
+			std::string function=thumbnailer->fileCommands[i].second;
+			String command=String(_T("rundll32 "))+dllShortFilename+_T(",")+s2ws(function)+_T(" %1");
+
+			RegistryCreate(HKEY_CLASSES_ROOT,cstr(type+_T("\\shell")));
+			RegistryCreate(HKEY_CLASSES_ROOT,cstr(type+_T("\\shell\\")+s2ws(text)));
+			RegistryCreate(HKEY_CLASSES_ROOT,cstr(type+_T("\\shell\\")+s2ws(text)+_T("\\command")));
+			RegistryWrite(HKEY_CLASSES_ROOT,cstr(type+_T("\\shell\\")+s2ws(text)+_T("\\command")),_T(""),cstr(command));
+		}
+	}
 
 	RegistryWrite(HKEY_LOCAL_MACHINE,_T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved"),Guid,_T(DESCRIPTION));
     

@@ -74,6 +74,10 @@ String ThumbPropertyType::getValue(Thumb *thumb){
 	return thumb->properies[index].value;
 }
 
+void Thumbnailer::addFileCommand(std::string text,std::string functionName){
+	fileCommands.push_back(std::pair<std::string,std::string>(text,functionName));
+}
+
 void Thumbnailer::registerProperties(){
 	if(LOBYTE(LOWORD(GetVersion()))<6) return;
 
