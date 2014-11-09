@@ -18,6 +18,8 @@ typedef   signed int	s32;
 #define GB *1024 MB
 #define TB *1024 GB
 
+#define ALIGN(v,a) ((((unsigned int)(v)) + (((unsigned int)(a))-1)) & (~(((unsigned int)(a))-1)))
+
 template<class T> struct Local{
 	T *object;
 

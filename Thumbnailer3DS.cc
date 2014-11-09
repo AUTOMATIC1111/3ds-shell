@@ -4,6 +4,7 @@
 #include "exdialog.h"
 #include "ShellUtils.h"
 #include "properties.h"
+#include "utils.h"
 #include <vector> 
 #include <list>
 #include <unordered_map> 
@@ -29,18 +30,13 @@ ThumbPropertyType propertyRating(PKEY_Rating,_T("System.Rating"));
 
 class Thumbnailer3DS;
 
-class Thumb3DS :public Thumb{
-public:
-	Thumb3DS(Stream *stream,Thumbnailer3DS *thumbnailer);
-	~Thumb3DS();
-
-	Thumbnailer3DS *th;
+struct Thumb3DSGeneric :public Thumb{
+	Thumb3DSGeneric(Stream *stream,Thumbnailer3DS *thumbnailer);
 
 	unsigned long long programId;
-	unsigned char mediaType;
-
 	std::string pid;
-	std::string rawPid;
+
+	virtual void init();
 
 	std::string title;
 	std::string region;
@@ -51,14 +47,43 @@ public:
 	std::string barcode;
 	std::string userRating;
 
-	void Thumbnail();
 	void ReadProperties();
 	void WriteProperties();
 
 	void readProps(Properties & props);
 	void writeProps(Properties & props);
 
+	void Thumbnail();
+	virtual Image *getImage();
+
+	Thumbnailer3DS *th;
 	Stream *stream;
+};
+
+class Thumb3DS :public Thumb3DSGeneric{
+public:
+	Thumb3DS(Stream *stream,Thumbnailer3DS *thumbnailer);
+	~Thumb3DS();
+
+	unsigned char mediaType;
+
+	std::string rawPid;
+
+	void ReadProperties();
+
+	void init();
+};
+
+
+class ThumbCIA :public Thumb3DSGeneric{
+public:
+	ThumbCIA(Stream *stream,Thumbnailer3DS *thumbnailer);
+	~ThumbCIA();
+
+	size_t imageOffset;
+	Image customImage;
+	Image *getImage();
+	void init();
 };
 
 class Thumbnailer3DS :public Thumbnailer{
@@ -68,6 +93,7 @@ public:
 
 	Image bg,mask,overlay,empty;
 
+	void init();
 	Thumb *Process(Stream *stream);
 };
 
@@ -75,10 +101,105 @@ Thumbnailer *CreateThumbnailer(){
 	return new Thumbnailer3DS();
 }
 
-Thumb3DS::Thumb3DS(Stream *st,Thumbnailer3DS *thumbnailer){
+Thumb3DSGeneric::Thumb3DSGeneric(Stream *st,Thumbnailer3DS *thumbnailer){
 	stream=st;
 	th=thumbnailer;
+}
 
+void Thumb3DSGeneric::init(){
+	Properties props;
+	props.read(cstr(format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+	props.read(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+	readProps(props);
+}
+void Thumb3DSGeneric::readProps(Properties & props){
+	if(props.contains("Title"))			title=props.get("Title");
+	if(props.contains("UserRating"))	userRating=props.get("UserRating");
+	if(props.contains("Region"))		region=props.get("Region");
+	if(props.contains("Date"))			date=props.get("Date");
+	if(props.contains("Rating"))		rating=props.get("Rating");
+	if(props.contains("Publisher"))		publisher=props.get("Publisher");
+	if(props.contains("Boxshot"))		boxshot=props.get("Boxshot");
+	if(props.contains("Barcode"))		barcode=props.get("Barcode");
+}
+void Thumb3DSGeneric::writeProps(Properties & props){
+	props.set("Title",ws2s(propertyTitle.getValue(this)));
+	props.set("UserRating",ws2s(propertyRating.getValue(this)));
+	props.set("Region",ws2s(propertyRegion.getValue(this)));
+	props.set("Date",ws2s(propertyDate.getValue(this)));
+	props.set("Rating",ws2s(propertySoftwareRating.getValue(this)));
+	props.set("Publisher",ws2s(propertyPublisher.getValue(this)));
+	props.set("Boxshot",boxshot);
+}
+void Thumb3DSGeneric::ReadProperties(){
+	propertyPid.setValue(this,s2ws(pid));
+
+	propertyTitle.setValue(this,s2ws(title));
+	propertyRegion.setValue(this,s2ws(region));
+	propertyDate.setValue(this,s2ws(date));
+	propertySoftwareRating.setValue(this,s2ws(rating));
+	propertyPublisher.setValue(this,s2ws(publisher));
+	propertyRating.setValue(this,s2ws(userRating));
+	
+	propertyProgramId.setValue(this,format(_T("%016llx"),programId));
+}
+void Thumb3DSGeneric::WriteProperties(){
+	if(pid.empty()) return;
+
+	Properties props;
+
+	writeProps(props);
+
+	props.write(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+}
+void Thumb3DSGeneric::Thumbnail(){
+	Image result("256x256","transparent");
+
+	int width=256,height=256;
+	
+	result.composite(th->bg,Geometry(width,width),OverCompositeOp);
+	
+	Image img;
+
+	Image *customImg=getImage();
+	if(! img.isValid()){
+		String filename=format(_T("%s\\user-boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
+		ReadImageFromFile(cstr(filename),&img);
+	}
+	if(! img.isValid()){
+		String filename=format(_T("%s\\boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
+		ReadImageFromFile(cstr(filename),&img);
+	}
+	if(customImg!=NULL && ! img.isValid()){
+		img=*customImg;
+	}
+	if(! img.isValid()){
+		img=th->empty;
+	}
+
+	img.resize(Geometry(182,182));
+	
+	Image iconfull(Geometry(width,width),"transparent");
+	iconfull.composite(img,32,29,MagickCore::OverCompositeOp);	
+	iconfull.composite(th->mask,CenterGravity,MagickCore::DstInCompositeOp);
+	result.composite(iconfull,CenterGravity,OverCompositeOp);
+	
+	result.composite(th->overlay,CenterGravity,OverCompositeOp);
+
+	image=result;
+}
+Image *Thumb3DSGeneric::getImage(){
+	return NULL;
+}
+
+
+Thumb3DS::Thumb3DS(Stream *st,Thumbnailer3DS *thumbnailer) :Thumb3DSGeneric(st,thumbnailer){
+
+}
+Thumb3DS::~Thumb3DS(){
+
+}
+void Thumb3DS::init(){
 	stream->seek(0x1150,0);
 
 	char pidfield[0x11]={0,};
@@ -99,99 +220,148 @@ Thumb3DS::Thumb3DS(Stream *st,Thumbnailer3DS *thumbnailer){
 		break;
 	}
 
+	if(pid.empty())
+		return;
+
 	stream->seek(0x18d,0);
 	stream->read(&mediaType,1);
 
 	stream->seek(0x1118,0);
 	stream->read(&programId,8);
 
-
-	Properties props;
-	props.read(cstr(format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
-	props.read(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
-	readProps(props);
-}
-Thumb3DS::~Thumb3DS(){
-
-}
-void Thumb3DS::readProps(Properties & props){
-	if(props.contains("Title"))			title=props.get("Title");
-	if(props.contains("UserRating"))	userRating=props.get("UserRating");
-	if(props.contains("Region"))		region=props.get("Region");
-	if(props.contains("Date"))			date=props.get("Date");
-	if(props.contains("Rating"))		rating=props.get("Rating");
-	if(props.contains("Publisher"))		publisher=props.get("Publisher");
-	if(props.contains("Boxshot"))		boxshot=props.get("Boxshot");
-	if(props.contains("Barcode"))		barcode=props.get("Barcode");
-}
-void Thumb3DS::writeProps(Properties & props){
-	props.set("Title",ws2s(propertyTitle.getValue(this)));
-	props.set("UserRating",ws2s(propertyRating.getValue(this)));
-	props.set("Region",ws2s(propertyRegion.getValue(this)));
-	props.set("Date",ws2s(propertyDate.getValue(this)));
-	props.set("Rating",ws2s(propertySoftwareRating.getValue(this)));
-	props.set("Publisher",ws2s(propertyPublisher.getValue(this)));
-	props.set("Boxshot",boxshot);
+	Thumb3DSGeneric::init();
 }
 
-void Thumb3DS::Thumbnail(){
-	Image result("256x256","transparent");
-
-	int width=256,height=256;
-	
-	result.composite(th->bg,Geometry(width,width),OverCompositeOp);
-	
-	Image img;
-	String filename=format(_T("%s\\user-boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
-	ReadImageFromFile(cstr(filename),&img);
-	if(! img.isValid()){
-		String filename=format(_T("%s\\boxshot\\%s"),dllDirectory,cstr(s2ws(boxshot)));
-		ReadImageFromFile(cstr(filename),&img);
-		if(! img.isValid()){
-			img=th->empty;
-		}
-	}
-	img.resize(Geometry(182,182));
-	
-	Image iconfull(Geometry(width,width),"transparent");
-	iconfull.composite(img,32,29,MagickCore::OverCompositeOp);	
-	iconfull.composite(th->mask,CenterGravity,MagickCore::DstInCompositeOp);
-	result.composite(iconfull,CenterGravity,OverCompositeOp);
-	
-	result.composite(th->overlay,CenterGravity,OverCompositeOp);
-
-	image=result;
-}
 void Thumb3DS::ReadProperties(){
-	propertyPid.setValue(this,s2ws(pid));
-
-	propertyTitle.setValue(this,s2ws(title));
-	propertyRegion.setValue(this,s2ws(region));
-	propertyDate.setValue(this,s2ws(date));
-	propertySoftwareRating.setValue(this,s2ws(rating));
-	propertyPublisher.setValue(this,s2ws(publisher));
-	propertyRating.setValue(this,s2ws(userRating));
-	
+	Thumb3DSGeneric::ReadProperties();
 
 	propertyRawPid.setValue(this,s2ws(rawPid));
-
 	char *mediaTypes[]={ "Inner Device", "Card1", "Card2", "Extended Device" };
 	if(mediaType<elems(mediaTypes))
 		propertyMediatype.setValue(this,cs2ws(mediaTypes[mediaType]));
 	else
 		propertyMediatype.setValue(this,format(_T("Unknown(%d)"),mediaType));
+}
 
-	propertyProgramId.setValue(this,format(_T("%016llx"),programId));
+ThumbCIA::ThumbCIA(Stream *st,Thumbnailer3DS *thumbnailer) :Thumb3DSGeneric(st,thumbnailer){
 
 }
-void Thumb3DS::WriteProperties(){
-	if(pid.empty()) return;
+ThumbCIA::~ThumbCIA(){
 
-	Properties props;
+}
+void ThumbCIA::init(){
+	imageOffset=-1;
 
-	writeProps(props);
+	stream->seek(8,0);
 
-	props.write(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+	size_t sizeHeader=ALIGN(0x2020,64);
+	size_t sizeCert=ALIGN(stream->readInt(),64);
+	size_t sizeTicket=ALIGN(stream->readInt(),64);
+	size_t sizeTMD=ALIGN(stream->readInt(),64);
+	size_t sizeMeta=ALIGN(stream->readInt(),64);
+	size_t sizeApp=ALIGN(stream->readInt(),64);
+
+	size_t startTMD=sizeHeader+sizeCert+sizeTicket;
+
+	if(sizeTMD==0)
+		return;
+
+	stream->seek((int)startTMD,0);
+	int sigsize;
+	int sigtype=stream->readIntBE();
+	switch(sigtype){
+	case 0x10000: sigsize=0x23c; break;
+	case 0x10001: sigsize=0x13c; break;
+	case 0x10002: sigsize=0x7c; break;
+	case 0x10003: sigsize=0x23c; break;
+	case 0x10004: sigsize=0x13c; break;
+	case 0x10005: sigsize=0x7c; break;
+	default: return;
+	}
+
+	stream->seek(sigsize,1);
+	size_t dataTMD=stream->tell();
+
+	stream->seek((int)dataTMD+0x4C,0);
+	stream->read(&programId,8);
+
+	pid=ws2s(format(_T("%016llx"),programId));
+
+	Thumb3DSGeneric::init();
+
+	size_t startSMDH=sizeHeader+sizeCert+sizeTicket+sizeTMD+sizeApp+0x400;
+
+	char head[5]={0,};
+	stream->seek((int)startSMDH,0);
+	stream->read(head,4);
+	if(strcmp(head,"SMDH")!=0)
+		return;
+	
+	imageOffset=startSMDH+0x24C0;
+
+	TCHAR longDescrField[0x80];
+	TCHAR publisherField[0x40];
+
+	stream->seek((int)startSMDH+8+0x200+0x80,0);
+	stream->read(longDescrField,0x100);
+	stream->read(publisherField,0x80);
+
+	longDescrField[0x7f]='\0';
+	publisherField[0x3f]='\0';
+
+	title=ws2s(longDescrField);
+	publisher=ws2s(publisherField);
+}
+
+
+static void decodeTile(int width,int iconSize, int tileSize, int ax, int ay, PixelPacket *pixels, Stream *fs){
+	if (tileSize == 0){
+		unsigned short color;
+		fs->read(&color,2);
+		
+		int red=(color>>0)&0x1f;
+		int green=(color>>5)&0x3f;
+		int blue=(color>>11)&0x1f;
+
+		Color magickColor=Color(red*QuantumRange/0x1f,green*QuantumRange/0x3f,blue*QuantumRange/0x1f);
+		pixels[ax+ay*width]=magickColor;
+	} else{
+		for (int y = 0; y < iconSize; y += tileSize)
+			for (int x = 0; x < iconSize; x += tileSize)
+				decodeTile(width,tileSize, tileSize / 2, x + ax, y + ay, pixels, fs);
+	}
+}
+
+
+Image *ThumbCIA::getImage(){
+	if(imageOffset==-1)
+		return NULL;
+
+	int width=48;
+	int height=48;
+	int rows=width/4;
+	int cols=height/4;
+
+	Image image(Geometry(width,height), "white");
+
+	image.type(TrueColorType);
+	image.modifyImage();
+	Pixels view(image);
+
+	stream->seek((int)imageOffset,0);
+
+	PixelPacket *pixels = view.get(0,0,width,height);
+	for(int y=0;y<height;y+=8){
+		for(int x=0;x<width;x+=8){
+			 decodeTile(width, 8, 8, x, y, pixels, stream);
+		}
+	}
+
+	view.sync();
+
+	customImage=image;
+
+	return &customImage;
 }
 
 extern "C" __declspec(dllexport) void CALLBACK WriteBoxshotW(HWND hwnd, HINSTANCE hinst, LPWSTR lpszCmdLine, int nCmdShow){
@@ -202,9 +372,9 @@ extern "C" __declspec(dllexport) void CALLBACK WriteBoxshotW(HWND hwnd, HINSTANC
 	}
 
 	Thumbnailer3DS thumbnailer;
-	Thumb3DS *thumb=(Thumb3DS *) thumbnailer.Process(&stream);
+	Thumb3DSGeneric *thumb=(Thumb3DSGeneric *) thumbnailer.Process(&stream);
 
-	if(thumb->pid.empty()){
+	if(thumb==NULL || thumb->pid.empty()){
 		MessageBox(hwnd,cstr(String(_T("Bad file: "))+lpszCmdLine),_T("Error"),0);
 		return;
 	}
@@ -277,6 +447,7 @@ Thumbnailer3DS::Thumbnailer3DS(){
 
 	extensions.push_back("3ds");
 	extensions.push_back("3dz");
+	extensions.push_back("cia");
 
 	addFileCommand("Change picture...","WriteBoxshot");
 
@@ -303,5 +474,32 @@ Thumbnailer3DS::~Thumbnailer3DS(){
 }
 
 Thumb *Thumbnailer3DS::Process(Stream *stream){
-	return new Thumb3DS(stream,this);
+	char head[5]={0,};
+	char headCIA[5]={0x20,0x20,0,0,0};
+	Thumb3DSGeneric *res=NULL;
+	
+	if(res==NULL){
+		stream->read(head,4);
+		stream->seek(0,0);
+
+		if(*(int *)head==*(int *)headCIA){
+			res=new ThumbCIA(stream,this);
+		}
+	}
+	
+	if(res==NULL){
+		stream->seek(0x100,0);
+		stream->read(head,4);
+		stream->seek(0,0);
+
+		if(strcmp(head,"NCSD")==0){
+			res=new Thumb3DS(stream,this);
+		}
+	}
+	
+	if(res!=NULL){
+		res->init();
+	}
+
+	return res;
 }

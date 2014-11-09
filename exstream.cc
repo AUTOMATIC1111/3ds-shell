@@ -52,6 +52,12 @@ int Stream::readInt(){
 
 	return res;
 }
+int Stream::readIntBE(){
+	unsigned int res=(unsigned int)readInt();
+	unsigned char *data=(unsigned char *) &res;
+
+	return (data[3]<<0) | (data[2]<<8) | (data[1]<<16) | (data[0]<<24);
+}
 
 
 std::string Stream::readline(){

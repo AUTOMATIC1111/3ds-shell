@@ -90,11 +90,15 @@ void CShellPreviewExt::process(int task){
 				thumb=thumbnailer->Process(stream);
 		}
 
-		if(!taskFinished[task]) switch(task){
-		case 0: break;
-		case 1: thumb->Thumbnail(); break;
-		case 2: thumb->ReadProperties(); break;
-		case 3: thumb->WriteProperties(); break;
+		
+
+		if(thumb!=NULL){
+			if(!taskFinished[task]) switch(task){
+			case 0: break;
+			case 1: thumb->Thumbnail(); break;
+			case 2: thumb->ReadProperties(); break;
+			case 3: thumb->WriteProperties(); break;
+			}
 		}
 		taskFinished[task]++;
 	} catch( Exception &error_ ) {

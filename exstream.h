@@ -26,6 +26,7 @@ public:
 	std::string readline();
 	std::string readUntil(int ch);
 	int readInt();
+	int readIntBE();
 
 	virtual ~Stream();
 
