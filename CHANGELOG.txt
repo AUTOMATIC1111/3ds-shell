@@ -1,3 +1,8 @@
+1.5.1
+
+  * Fixed error with red and blue colors swapped for CIA files.
+  * 48x48 icons from CIA files are not upscaled using box filter.
+
 1.5
 
   * Added support for CIA files.

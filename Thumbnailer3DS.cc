@@ -176,7 +176,8 @@ void Thumb3DSGeneric::Thumbnail(){
 	if(! img.isValid()){
 		img=th->empty;
 	}
-
+	
+	if(img.columns()<=182/2) img.filterType(BoxFilter);
 	img.resize(Geometry(182,182));
 	
 	Image iconfull(Geometry(width,width),"transparent");
@@ -319,9 +320,9 @@ static void decodeTile(int width,int iconSize, int tileSize, int ax, int ay, Pix
 		unsigned short color;
 		fs->read(&color,2);
 		
-		int red=(color>>0)&0x1f;
+		int blue=(color>>0)&0x1f;
 		int green=(color>>5)&0x3f;
-		int blue=(color>>11)&0x1f;
+		int red=(color>>11)&0x1f;
 
 		Color magickColor=Color(red*QuantumRange/0x1f,green*QuantumRange/0x3f,blue*QuantumRange/0x1f);
 		pixels[ax+ay*width]=magickColor;
