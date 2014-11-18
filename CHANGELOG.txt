@@ -1,7 +1,11 @@
-1.5.1
+1.5.3
+
+  * Images are now resized to 182x instead of 182x182
+  
+1.5.2
 
   * Fixed error with red and blue colors swapped for CIA files.
-  * 48x48 icons from CIA files are not upscaled using box filter.
+  * 48x48 icons from CIA files are now upscaled using box filter.
 
 1.5
 
@@ -9,7 +13,7 @@
 
 1.4	
 
-  * Added editing for properies.
+  * Added editing for properties.
   * Added an option to content menu to change ROM picture.
   * PIDs can now only contain english letters, digits and dashes.
   * Fixed properties not showing when you have a file manually associated with a program.

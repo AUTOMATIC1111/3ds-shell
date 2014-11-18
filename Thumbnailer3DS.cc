@@ -178,7 +178,7 @@ void Thumb3DSGeneric::Thumbnail(){
 	}
 	
 	if(img.columns()<=182/2) img.filterType(BoxFilter);
-	img.resize(Geometry(182,182));
+	img.resize(Geometry("182x"));
 	
 	Image iconfull(Geometry(width,width),"transparent");
 	iconfull.composite(img,32,29,MagickCore::OverCompositeOp);	
