@@ -13,6 +13,8 @@ namespace std{
 #endif
 };
 
+unsigned long long swapLongLong(unsigned long long x);
+
 typedef std::tstring String;
 #define cstr(a) ((TCHAR *)((a).c_str()))
 

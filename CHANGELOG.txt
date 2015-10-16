@@ -1,3 +1,7 @@
+1.5
+
+  * Fixed wrong format for CIA ProductId
+  
 1.5.3
 
   * Images are now resized to 182x instead of 182x182

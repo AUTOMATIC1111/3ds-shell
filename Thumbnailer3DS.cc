@@ -35,7 +35,8 @@ struct Thumb3DSGeneric :public Thumb{
 
 	unsigned long long programId;
 	std::string pid;
-
+	std::string pidAlternative;
+	
 	virtual void init();
 
 	std::string title;
@@ -108,8 +109,14 @@ Thumb3DSGeneric::Thumb3DSGeneric(Stream *st,Thumbnailer3DS *thumbnailer){
 
 void Thumb3DSGeneric::init(){
 	Properties props;
-	props.read(cstr(format(_T("%s\\info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
-	props.read(cstr(format(_T("%s\\user-info\\%s.txt"),dllDirectory,cstr(s2ws(pid)))));
+
+	if (! pidAlternative.empty()){
+		props.read(cstr(format(_T("%s\\info\\%s.txt"), dllDirectory, cstr(s2ws(pidAlternative)))));
+		props.read(cstr(format(_T("%s\\user-info\\%s.txt"), dllDirectory, cstr(s2ws(pidAlternative)))));
+	}
+
+	props.read(cstr(format(_T("%s\\info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
+	props.read(cstr(format(_T("%s\\user-info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
 	readProps(props);
 }
 void Thumb3DSGeneric::readProps(Properties & props){
@@ -141,7 +148,7 @@ void Thumb3DSGeneric::ReadProperties(){
 	propertyPublisher.setValue(this,s2ws(publisher));
 	propertyRating.setValue(this,s2ws(userRating));
 	
-	propertyProgramId.setValue(this,format(_T("%016llx"),programId));
+	propertyProgramId.setValue(this, format(_T("%016llx"), programId));
 }
 void Thumb3DSGeneric::WriteProperties(){
 	if(pid.empty()) return;
@@ -286,7 +293,10 @@ void ThumbCIA::init(){
 	stream->seek((int)dataTMD+0x4C,0);
 	stream->read(&programId,8);
 
-	pid=ws2s(format(_T("%016llx"),programId));
+	pidAlternative = ws2s(format(_T("%016llx"), programId));
+	programId = swapLongLong(programId);
+
+	pid = ws2s(format(_T("%016llx"), programId));
 
 	Thumb3DSGeneric::init();
 

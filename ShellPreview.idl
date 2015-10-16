@@ -1,0 +1,36 @@
+#include "defines.h"
+
+import "oaidl.idl";
+import "ocidl.idl";
+import "propsys.idl";
+
+	[
+		object,
+		uuid( GUID_INTERFACE ),
+		dual,
+		helpstring(DESCRIPTION " shell preview extension interface"),
+		pointer_default(unique)
+	]
+	interface IShellPreviewExt : IDispatch
+	{
+	};
+
+[
+	uuid( GUID_LIBRARY ),
+	version(1.0),
+	helpstring(DESCRIPTION " type library")
+]
+library FILEICONSLib
+{
+	importlib("stdole32.tlb");
+	importlib("stdole2.tlb");
+
+	[
+		uuid( GUID_CLASS ),
+		helpstring(DESCRIPTION " shell preview extension class")
+	]
+	coclass ShellPreviewExt
+	{
+		[default] interface IShellPreviewExt;
+	};
+};
