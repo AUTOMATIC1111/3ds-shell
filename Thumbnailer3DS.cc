@@ -93,6 +93,7 @@ public:
 	~Thumbnailer3DS();
 
 	Image bg,mask,overlay,empty;
+	std::unordered_map<std::string, std::string> productIdMap;
 
 	void init();
 	Thumb *Process(Stream *stream);
@@ -117,6 +118,16 @@ void Thumb3DSGeneric::init(){
 
 	props.read(cstr(format(_T("%s\\info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
 	props.read(cstr(format(_T("%s\\user-info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
+
+
+	std::unordered_map<std::string, std::string>::const_iterator iter = th->productIdMap.find(pid);
+	if (iter != th->productIdMap.end()){
+		pid = iter->second;
+
+		props.read(cstr(format(_T("%s\\info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
+		props.read(cstr(format(_T("%s\\user-info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
+	}
+
 	readProps(props);
 }
 void Thumb3DSGeneric::readProps(Properties & props){
@@ -343,7 +354,6 @@ static void decodeTile(int width,int iconSize, int tileSize, int ax, int ay, Pix
 	}
 }
 
-
 Image *ThumbCIA::getImage(){
 	if(imageOffset==-1)
 		return NULL;
@@ -467,7 +477,7 @@ Thumbnailer3DS::Thumbnailer3DS(){
 	propertyRegion.editable=true;
 	propertyDate.editable=true;
 	propertySoftwareRating.editable=true;
-	propertyPublisher.editable=true;
+	propertyPublisher.editable = true;
 
 	properties.push_back(&propertyPid);
 	properties.push_back(&propertyTitle);
@@ -479,6 +489,24 @@ Thumbnailer3DS::Thumbnailer3DS(){
 	properties.push_back(&propertyProgramId);
 	properties.push_back(&propertyMediatype);
 	properties.push_back(&propertyRating);
+
+	std::list<String> files;
+	listFiles(cstr(format(_T("%s\\user-info"), dllDirectory)), files);
+	listFiles(cstr(format(_T("%s\\info"), dllDirectory)), files);
+
+	std::list<String>::const_iterator iter;
+	for (iter = files.begin(); iter != files.end(); ++iter) {
+		Properties props;
+		props.read(*iter);
+
+		std::string programId=props.get("ProgramId");
+		if (programId.empty()) continue;
+
+		std::string PID = props.get("PID");
+		if (PID.empty()) continue;
+
+		productIdMap.insert(std::make_pair(programId, PID));
+	}
 }
 
 Thumbnailer3DS::~Thumbnailer3DS(){

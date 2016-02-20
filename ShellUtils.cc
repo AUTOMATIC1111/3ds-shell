@@ -171,7 +171,7 @@ std::tstring filesize(size_t size){
 	return _T("HUGE!");
 }
 
-void list(TCHAR *path, void (*handler)(TCHAR *filename)){
+void listFiles(TCHAR *path, std::list<String>& files){
     WIN32_FIND_DATA fdFile; 
     HANDLE hFind = NULL; 
 
@@ -189,9 +189,9 @@ void list(TCHAR *path, void (*handler)(TCHAR *filename)){
         _sntprintf(sPath,4096,_T("%s\\%s"), path, fdFile.cFileName); 
 
 		if(fdFile.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) { 
-			list(sPath,handler);
-		} else{ 
-			handler(sPath);
+			listFiles(sPath, files);
+		} else{
+			files.push_back(sPath);
         }
     } 
     while(FindNextFile(hFind, &fdFile));

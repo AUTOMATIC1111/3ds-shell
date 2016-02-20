@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <list>
 
 
 namespace std{
@@ -47,7 +48,7 @@ extern HRESULT (*PSUnregisterPropertySchemaDLL)(PCWSTR pszPath);
 
 std::tstring filesize(size_t size);
 
-void list(TCHAR *path, void (*handler)(TCHAR *filename));
+void listFiles(TCHAR *path, std::list<String> & files);
 
 void reloadExplorer();
 
