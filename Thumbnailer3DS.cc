@@ -119,8 +119,10 @@ void Thumb3DSGeneric::init(){
 	props.read(cstr(format(_T("%s\\info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
 	props.read(cstr(format(_T("%s\\user-info\\%s.txt"), dllDirectory, cstr(s2ws(pid)))));
 
+	std::string pidLowercase = pid;
+	std::transform(pidLowercase.begin(), pidLowercase.end(), pidLowercase.begin(), ::tolower);
 
-	std::unordered_map<std::string, std::string>::const_iterator iter = th->productIdMap.find(pid);
+	std::unordered_map<std::string, std::string>::const_iterator iter = th->productIdMap.find(pidLowercase);
 	if (iter != th->productIdMap.end()){
 		pid = iter->second;
 
@@ -505,6 +507,7 @@ Thumbnailer3DS::Thumbnailer3DS(){
 		std::string PID = props.get("PID");
 		if (PID.empty()) continue;
 
+		std::transform(programId.begin(), programId.end(), programId.begin(), ::tolower);
 		productIdMap.insert(std::make_pair(programId, PID));
 	}
 }
